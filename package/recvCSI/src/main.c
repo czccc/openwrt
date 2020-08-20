@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
          */
         log_flag = 0;
         printf("/**************************************/\n");
-        printf("/*   Usage: recv_csi <output_file>    */\n");
+        printf("/*   Usage: recvCSI <output_file>     */\n");
         printf("/**************************************/\n");
     }
     if (2 == argc)
@@ -85,11 +85,11 @@ int main(int argc, char *argv[])
     fd = open_csi_device();
     if (fd < 0)
     {
-        perror("Failed to open the device...");
+        perror("Failed to open the device...\n");
         return errno;
     }
 
-    printf("#Receiving data! Press Ctrl+C to quit!\n");
+    printf("# Receiving data! Press Ctrl+C to quit!\n");
 
     quit = 0;
     total_msg_cnt = 0;

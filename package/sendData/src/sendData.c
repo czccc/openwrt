@@ -34,11 +34,11 @@
 
 /* Define the defult destination MAC address */
 #define DEFAULT_DEST_MAC0 0x00
-#define DEFAULT_DEST_MAC1 0x03
-#define DEFAULT_DEST_MAC2 0x7F
-#define DEFAULT_DEST_MAC3 0xB0
-#define DEFAULT_DEST_MAC4 0x20
-#define DEFAULT_DEST_MAC5 0x20
+#define DEFAULT_DEST_MAC1 0x23
+#define DEFAULT_DEST_MAC2 0x93
+#define DEFAULT_DEST_MAC3 0x94
+#define DEFAULT_DEST_MAC4 0xE2
+#define DEFAULT_DEST_MAC5 0x94
 
 #define DEFAULT_IF "wlan0"
 #define BUF_SIZ 2048
@@ -56,11 +56,15 @@ int main(int argc, char *argv[])
 	struct iphdr *iph = (struct iphdr *)(sendbuf + sizeof(struct ether_header));
 	struct sockaddr_ll socket_address;
 	char ifName[IFNAMSIZ];
+	int interval;
+	int log_interval;
 
 	if (argc == 1)
 	{
-		printf("Usage:   %s ifName DstMacAddr NumOfPacketToSend\n", argv[0]);
-		printf("Example: %s wlan0 00:7F:5D:3E:4A 100\n", argv[0]);
+		printf("Usage:   %s ifName  DstMacAddr         interval  Log  NumOfPacket\n", argv[0]);
+		printf("Example: %s wlan0   00:23:93:94:E2:94  50 ms     20   100\n", argv[0]);
+		printf("A:  00:23:93:94:E2:94  00:23:93:94:E2:95\n");
+		printf("B:  88:25:93:94:E2:4F  00:23:93:94:E2:50\n");
 		exit(0);
 	}
 
@@ -74,7 +78,6 @@ int main(int argc, char *argv[])
 	if (argc > 2)
 	{
 		sscanf(argv[2], "%x:%x:%x:%x:%x:%x", &DstAddr[0], &DstAddr[1], &DstAddr[2], &DstAddr[3], &DstAddr[4], &DstAddr[5]);
-		//printf("DstMacAddr: %02x:%02x:%02x:%02x:%02x:%02x\n",DstAddr[0],DstAddr[1],DstAddr[2],DstAddr[3],DstAddr[4],DstAddr[5]);
 	}
 	else
 	{
@@ -85,11 +88,22 @@ int main(int argc, char *argv[])
 		DstAddr[4] = DEFAULT_DEST_MAC4;
 		DstAddr[5] = DEFAULT_DEST_MAC5;
 	}
+	printf("DstMacAddr: %02x:%02x:%02x:%02x:%02x:%02x\n", DstAddr[0], DstAddr[1], DstAddr[2], DstAddr[3], DstAddr[4], DstAddr[5]);
 
 	if (argc > 3)
+		interval = atoi(argv[3]);
+	else
+		interval = 50;
+
+	if (argc > 4)
 		Cnt = atoi(argv[3]);
 	else
-		Cnt = 1;
+		Cnt = -1;
+
+	if (argc > 5)
+		log_interval = atoi(argv[3]);
+	else
+		log_interval = 10;
 
 	/* Open RAW socket to send on */
 	if ((sockfd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL))) == -1)
@@ -132,10 +146,13 @@ int main(int argc, char *argv[])
      * We just set it to 0xaa you send arbitrary payload you like*/
 	for (i = 1; i <= 1000; i++)
 	{
-
+		// change packet data here
 		sendbuf[tx_len++] = 0xaa;
 	}
-	printf("Packet Length is: %d,pkt_num is: %d\n", tx_len, Cnt);
+	if (Cnt > 0)
+		printf("Packet Length is: %d, Packet number to send is: %d\n", tx_len, Cnt);
+	else
+		printf("Packet Length is: %d, Packet number to send is Infinite\n", tx_len);
 
 	/* Index of the network device */
 	socket_address.sll_ifindex = if_idx.ifr_ifindex;
@@ -162,19 +179,49 @@ int main(int argc, char *argv[])
 	socket_address.sll_addr[5] = DstAddr[5];
 
 	/* Send packet */
-	for (; Cnt > 0; Cnt--)
+	printf("Start send! Press Ctrl+C to stop!\n");
+	if (Cnt > 0)
 	{
-		/* you set the time interval between two transmitting packets 
-         * for example, here we set it to 50 microseconds
-         * set to 0 if you don't need it
-         */
-		if (usleep(50) == -1)
+		int log_sended = 0;
+		for (; Cnt > 0; Cnt--)
 		{
-			printf("sleep failed\n");
+			/* you set the time interval between two transmitting packets 
+			* for example, here we set it to 50 microseconds
+			* set to 0 if you don't need it
+			*/
+			if (usleep(interval * 1000) == -1)
+			{
+				printf("sleep failed\n");
+			}
+			if (sendto(sockfd, sendbuf, tx_len, 0, (struct sockaddr *)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+			{
+				printf("Send failed\n");
+			}
+			log_sended++;
+			if (log_sended % log_interval == 0)
+			{
+				printf("Sended %d packets\n", log_sended);
+			}
 		}
-		if (sendto(sockfd, sendbuf, tx_len, 0, (struct sockaddr *)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+	}
+	else
+	{
+		int log_sended = 0;
+		for (;;)
 		{
-			printf("Send failed\n");
+			if (usleep(interval * 1000) == -1)
+			{
+				printf("sleep failed\n");
+			}
+			if (sendto(sockfd, sendbuf, tx_len, 0, (struct sockaddr *)&socket_address, sizeof(struct sockaddr_ll)) < 0)
+			{
+				printf("Send failed\n");
+			}
+			log_sended++;
+			if (log_sended % log_interval == 0)
+			{
+				printf("Sended %d packets\n", log_sended);
+			}
 		}
 	}
 
